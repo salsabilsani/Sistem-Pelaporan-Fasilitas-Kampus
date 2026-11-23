@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "760464492136",
+    "project_id": "silapor-7d7a7",
+    "storage_bucket": "silapor-7d7a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:760464492136:android:08f19666cbc84803c59ddd",
+        "android_client_info": {
+          "package_name": "com.example.silapor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-YvWl1yiYp8lpaxNTTtCFk_1VAh2htU8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

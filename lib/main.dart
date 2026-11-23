@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
 
 import 'screens/landing/landing_screen.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'utils/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
@@ -39,7 +50,7 @@ class _AppEntryState extends State<AppEntry> {
   void _openLogin() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const LoginPage(),
+        builder: (_) => LoginPage(),
       ),
     );
   }
@@ -70,7 +81,9 @@ class _AppEntryState extends State<AppEntry> {
 }
 
 class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
+  LoginPage({super.key});
+
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +104,45 @@ class LoginPage extends StatelessWidget {
           ),
         ),
       ),
-      body: const LoginScreen(),
+      body: LoginScreen(
+        onSignIn: (email, password) async {
+          try {
+            await _authService.login(
+              email: email,
+              password: password,
+            );
+
+            return null;
+          } on FirebaseAuthException catch (e) {
+            switch (e.code) {
+              case 'user-not-found':
+                return 'Email belum terdaftar.';
+              case 'wrong-password':
+                return 'Password yang kamu masukkan salah.';
+              case 'invalid-credential':
+                return 'Email atau password salah.';
+              case 'invalid-email':
+                return 'Format email tidak valid.';
+              case 'user-disabled':
+                return 'Akun ini telah dinonaktifkan.';
+              case 'too-many-requests':
+                return 'Terlalu banyak percobaan. Coba lagi nanti.';
+              default:
+                return 'Login gagal. ${e.message ?? 'Silakan coba lagi.'}';
+            }
+          } catch (e) {
+            return 'Terjadi kesalahan. Silakan coba kembali.';
+          }
+        },
+        onSignedIn: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login Firebase berhasil!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      ),
     );
   }
 }
