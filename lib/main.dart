@@ -4,10 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
+import 'services/firestore_service.dart';
 
+import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/landing/landing_screen.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/register/register_screen.dart';
 import 'utils/app_theme.dart';
 
 Future<void> main() async {
@@ -85,6 +88,23 @@ class LoginPage extends StatelessWidget {
 
   final AuthService _authService = AuthService();
 
+  String _registerError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return 'Email ini sudah terdaftar.';
+      case 'invalid-email':
+        return 'Format email tidak valid.';
+      case 'weak-password':
+        return 'Password terlalu lemah.';
+      case 'operation-not-allowed':
+        return 'Registrasi email belum diaktifkan.';
+      case 'too-many-requests':
+        return 'Terlalu banyak percobaan. Coba lagi nanti.';
+      default:
+        return 'Registrasi gagal. ${e.message ?? 'Silakan coba kembali.'}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,9 +119,7 @@ class LoginPage extends StatelessWidget {
           onPressed: () {
             Navigator.of(context).pop();
           },
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded),
         ),
       ),
       body: LoginScreen(
@@ -111,7 +129,6 @@ class LoginPage extends StatelessWidget {
               email: email,
               password: password,
             );
-
             return null;
           } on FirebaseAuthException catch (e) {
             switch (e.code) {
@@ -128,17 +145,86 @@ class LoginPage extends StatelessWidget {
               case 'too-many-requests':
                 return 'Terlalu banyak percobaan. Coba lagi nanti.';
               default:
-                return 'Login gagal. ${e.message ?? 'Silakan coba lagi.'}';
+                return 'Login gagal. ${e.message ?? 'Silakan coba kembali.'}';
             }
           } catch (e) {
             return 'Terjadi kesalahan. Silakan coba kembali.';
           }
         },
-        onSignedIn: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login Firebase berhasil!'),
-              behavior: SnackBarBehavior.floating,
+        onSignedIn: () async {
+          final user = _authService.currentUser;
+
+          if (user == null) return;
+
+          Map<String, dynamic>? profil;
+
+          try {
+            profil = await FirestoreService().getProfil(user.uid);
+          } catch (e) {
+            profil = null;
+          }
+
+          if (!context.mounted) return;
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => DashboardScreen(
+                nama: profil?['nama'] ?? user.displayName ?? 'Mahasiswa',
+                email: profil?['email'] ?? user.email ?? '',
+                onLogout: () async {
+                  await _authService.logout();
+
+                  if (!context.mounted) return;
+
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AppEntry(),
+                    ),
+                    (route) => false,
+                  );
+                },
+              ),
+            ),
+          );
+        },
+        onRegister: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (registerContext) {
+                return RegisterScreen(
+                  onRegister: (nama, email, password) async {
+                    try {
+                      final credential = await _authService.register(
+                        email: email,
+                        password: password,
+                      );
+
+                      final user = credential.user;
+
+                      if (user == null) {
+                        return 'Registrasi gagal. Silakan coba kembali.';
+                      }
+
+                      await FirestoreService().simpanProfil(
+                        uid: user.uid,
+                        nama: nama,
+                        email: email,
+                      );
+
+                      await _authService.logout();
+
+                      return null;
+                    } on FirebaseAuthException catch (e) {
+                      return _registerError(e);
+                    } catch (e) {
+                      return 'Akun berhasil dibuat, tetapi profil gagal disimpan. Silakan hubungi pengelola.';
+                    }
+                  },
+                  onBackToLogin: () {
+                    Navigator.of(registerContext).pop();
+                  },
+                );
+              },
             ),
           );
         },
